@@ -1,4 +1,4 @@
-name := "QuosiQuoteTest"
+name := "QuasiQuoteTest"
 
 version := "0.1"
 
@@ -17,5 +17,6 @@ libraryDependencies ++= Seq(
   "edu.stanford.cs.dawn" %% "spatial" % "1.1-SNAPSHOT"
 )
 
-libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+libraryDependencies += "org.scala-lang" % "scala-reflect" % scalaVersion.value
 
+scalacOptions ++= Seq("-Xprint:parse")
