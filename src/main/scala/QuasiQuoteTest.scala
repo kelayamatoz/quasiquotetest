@@ -14,7 +14,7 @@ object StreamFlowServer {
   def getTypeName(sign: scala.Boolean): TypeName = {
     sign match {
       case true => TypeName("TRUE")
-      case _ => TypeName("FALSE")
+      case _    => TypeName("FALSE")
     }
   }
 
@@ -66,7 +66,6 @@ object StreamFlowServer {
   }
 }
 
-
 trait TestTrait {
   val _s = StreamFlowServer.stateHolder
 
@@ -112,7 +111,12 @@ case class InstanceHolder(v: Any)
     val dram0 = DRAM[spatial.lang.FixPt[TRUE, _32, _0]](32.to[I32])
     val dram1 = DRAM[spatial.lang.FixPt[TRUE, _32, _0]](32.to[I32])
     scala.Console.println("testing...")
-    val m = StreamFlowServer.constructTypeQuasiQuote[DRAM1[_]]("DRAM", "FixPt", true, 16, 16, List(32))
+    val m = StreamFlowServer.constructTypeQuasiQuote[DRAM1[_]]("DRAM",
+                                                               "FixPt",
+                                                               true,
+                                                               16,
+                                                               16,
+                                                               List(32))
 
     val cmds = new ListBuffer[() => Any]()
     val varQ = new ListBuffer[Any]()
@@ -122,15 +126,40 @@ case class InstanceHolder(v: Any)
     val stepSize = 32
     val p = 1
 
-
     val foreachCmds1: ListBuffer[I32 => Any] = new ListBuffer[I32 => Any]()
     val foreachCmds2: ListBuffer[I32 => Any] = new ListBuffer[I32 => Any]()
+
+    // TODO: What could be a more general case?
+    def dram2sramLoad[A](sram: Any,
+                         dram: DRAM1[A],
+                         range: argon.lang.Series[I32]): Void = {
+      val s = sram.asInstanceOf[SRAM1[A]]
+      s load dram(range)
+    }
+
+    def sram2dramStore[A](sram: Any,
+                                dram: DRAM1[A],
+                                range: argon.lang.Series[I32]): Void = {
+      dram(range).store(sram.asInstanceOf[SRAM1[A]], 32.to[I32])
+    }
+
     foreachCmds1.append(
-      (i: I32) => { PythonSpaceVar.tmpSRAM.asInstanceOf[SRAM1[_]].load(dram0) }
+      (i: I32) => {
+        val r = i :: 32.to[I32];
+        scala.Console.println("instantiating DRAM2SRAM")
+        dram2sramLoad(sram = PythonSpaceVar.tmpSRAM, dram = dram0, range = r)
+      }
     )
 
     foreachCmds2.append(
-      (i: I32) => { dram1 store PythonSpaceVar.tmpSRAM.asInstanceOf[SRAM1[_]]}
+      (i: I32) => {
+        val r = i :: 32.to[I32];
+        scala.Console.println("instantiating SRAM2DRAM")
+        sram2dramStore(sram =
+                         PythonSpaceVar.tmpSRAM,
+                       dram = dram1,
+                       range = r)
+      }
     )
 
     def runLoop(i: I32) = {
@@ -142,22 +171,36 @@ case class InstanceHolder(v: Any)
     }
 
     cmds.append(
-      () => {val m = Reg[Int]; PythonSpaceVar.tmp = m},
-      () => {PythonSpaceVar.tmp.asInstanceOf[Reg[Int]] := argInB.value + 1.to[Int]},
-      () => {argOutC := argInA.value + argInB.value + PythonSpaceVar.tmp.asInstanceOf[Reg[Int]].value},
-      () => {PythonSpaceVar.tmpSRAM = SRAM[Int](32.to[I32])},
+//      () => { val m = Reg[Int]; PythonSpaceVar.tmp = m },
+//      () => {
+//        PythonSpaceVar.tmp.asInstanceOf[Reg[Int]] := argInB.value + 1.to[Int]
+//      },
+//      () => {
+//        argOutC := argInA.value + argInB.value + PythonSpaceVar.tmp
+//          .asInstanceOf[Reg[Int]]
+//          .value
+//      },
+      () => { PythonSpaceVar.tmpSRAM = SRAM[Int](32.to[I32]) },
       () => {
-        Foreach (start.to[I32] until stop.to[I32] by stepSize.to[I32] par p.to[I32]) { i =>
-        runLoop(i)
-      }},
+        Foreach(
+          start.to[I32] until stop.to[I32] by stepSize.to[I32] par p.to[I32]) {
+          i => {
+            scala.Console.println("running loop 0 at iter " + i)
 
-      () => {
-        Foreach (start.to[I32] until stop.to[I32] by stepSize.to[I32] par p.to[I32]) { i =>
-          runLoopNew(i)
+            runLoop(i)
+          }
         }
-      }
+      },
+//      () => {
+//        Foreach(
+//          start.to[I32] until stop.to[I32] by stepSize.to[I32] par p.to[I32]) {
+//          i => {
+//            scala.Console.println("running loop 1 at iter " + i)
+//            runLoopNew(i)
+//          }
+//        }
+//      }
     )
-
 
     Accel {
       cmds.foreach(m => m())
