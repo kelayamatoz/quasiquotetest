@@ -137,9 +137,11 @@ case class InstanceHolder(v: Any)
       s load dram(range)
     }
 
+
+    // TODO: Do we want to have SRAM stores that are not starting from 0?
     def sram2dramStore[A](sram: Any,
-                                dram: DRAM1[A],
-                                range: argon.lang.Series[I32]): Void = {
+                          dram: DRAM1[A],
+                          range: argon.lang.Series[I32]): Void = {
       dram(range).store(sram.asInstanceOf[SRAM1[A]], 32.to[I32])
     }
 
@@ -155,10 +157,7 @@ case class InstanceHolder(v: Any)
       (i: I32) => {
         val r = i :: 32.to[I32];
         scala.Console.println("instantiating SRAM2DRAM")
-        sram2dramStore(sram =
-                         PythonSpaceVar.tmpSRAM,
-                       dram = dram1,
-                       range = r)
+        sram2dramStore(sram = PythonSpaceVar.tmpSRAM, dram = dram1, range = r)
       }
     )
 
@@ -171,39 +170,64 @@ case class InstanceHolder(v: Any)
     }
 
     cmds.append(
-//      () => { val m = Reg[Int]; PythonSpaceVar.tmp = m },
-//      () => {
-//        PythonSpaceVar.tmp.asInstanceOf[Reg[Int]] := argInB.value + 1.to[Int]
-//      },
-//      () => {
-//        argOutC := argInA.value + argInB.value + PythonSpaceVar.tmp
-//          .asInstanceOf[Reg[Int]]
-//          .value
-//      },
+      () => { val m = Reg[Int]; PythonSpaceVar.tmp = m },
+      () => {
+        PythonSpaceVar.tmp.asInstanceOf[Reg[Int]] := argInB.value + 1.to[Int]
+      },
+      () => {
+        argOutC := argInA.value + argInB.value + PythonSpaceVar.tmp
+          .asInstanceOf[Reg[Int]]
+          .value
+      },
       () => { PythonSpaceVar.tmpSRAM = SRAM[Int](32.to[I32]) },
       () => {
         Foreach(
           start.to[I32] until stop.to[I32] by stepSize.to[I32] par p.to[I32]) {
-          i => {
-            scala.Console.println("running loop 0 at iter " + i)
+          i =>
+            {
+              scala.Console.println("running loop 0 at iter " + i)
 
-            runLoop(i)
-          }
+              runLoop(i)
+            }
         }
       },
-//      () => {
-//        Foreach(
-//          start.to[I32] until stop.to[I32] by stepSize.to[I32] par p.to[I32]) {
-//          i => {
-//            scala.Console.println("running loop 1 at iter " + i)
-//            runLoopNew(i)
-//          }
-//        }
-//      }
+      () => {
+        Foreach(
+          start.to[I32] until stop.to[I32] by stepSize.to[I32] par p.to[I32]) {
+          i => {
+            scala.Console.println("running loop 1 at iter " + i)
+            runLoopNew(i)
+          }
+        }
+      }
     )
 
     Accel {
       cmds.foreach(m => m())
+
+//      val m = Reg[Int]
+//      PythonSpaceVar.tmp = m
+//      PythonSpaceVar.tmp.asInstanceOf[Reg[Int]] := argInB.value + 1.to[Int]
+//      argOutC := argInA.value + argInB.value + PythonSpaceVar.tmp
+//        .asInstanceOf[Reg[Int]]
+//        .value
+//      PythonSpaceVar.tmpSRAM = SRAM[Int](32.to[I32])
+//      Foreach(
+//        start.to[I32] until stop.to[I32] by stepSize.to[I32] par p.to[I32]
+//      ) { i =>
+//        {
+//          val r = i :: 32.to[I32]
+//          dram2sramLoad(PythonSpaceVar.tmpSRAM, dram = dram0, range = r)
+//        }
+//      }
+//
+//      Foreach(
+//        start.to[I32] until stop.to[I32] by stepSize.to[I32] par p.to[I32]) {
+//        i => {
+//          val r = i :: 32.to[I32];
+//          sram2dramStore(sram = PythonSpaceVar.tmpSRAM, dram = dram1, range = r)
+//        }
+//      }
     }
 
     getMem(dram0)
